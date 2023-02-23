@@ -11,7 +11,7 @@ int BoardGame::startGame(){
 			promptPlayer(player);
 			if(calculateVictory(player) == true){
 				printTable();
-				std::cout << "GAME OVER!";
+				std::cout << "GAME OVER!\n" << "Player " << player.getPlayerMark() << " wins!\n";
 				return 0;
 			};
 		}
@@ -32,7 +32,7 @@ int BoardGame::findOrigin(const int &rowsize){
 
 
 //convert 2D array to grid
-std::tuple<int,int,int> BoardGame::getXY(int X, int Y, const int &origin){
+std::tuple<int,int> BoardGame::getXY(int X, int Y, const int &origin){
 	int pos[2] = {X,Y};
 	for(auto& coord : pos){
 		if(coord < origin){
@@ -48,16 +48,22 @@ std::tuple<int,int,int> BoardGame::getXY(int X, int Y, const int &origin){
 	}
 	//invert the Y axis
 	pos[1] *= -1;
-	return std::make_tuple(pos[0],pos[1],0);
+	return std::make_tuple(pos[0],pos[1]);
 }
 
 //only does negative degrees
 std::array<int,2> BoardGame::rotMatrixMultiply(const double &degrees,int pos[]){
 	double radians = degrees * (M_PI / 180);
-	double rot_matrix[2][2] = {{std::cos(radians),(std::sin(radians) * -1)},{std::sin(radians), std::cos(radians)}};
+	Eigen::Rotation2D t(radians);
+	Eigen::Vector2d xy(pos[0],pos[1]);
 	std::array<int,2> pos_arr;
-    pos_arr[0] = atan2(rot_matrix[1][0], rot_matrix[0][0]);
-    pos_arr[1] = atan2(-rot_matrix[0][1], rot_matrix[1][1]);
+
+	xy = t.toRotationMatrix() * xy;
+
+	//Double to int causes rounding errors	
+	pos_arr[0] = (int)(xy[0] < 0 ? xy[0] - 0.5 : xy[0] + 0.5);
+	pos_arr[1] = (int)(xy[1] < 0 ? xy[1] - 0.5 : xy[1] + 0.5);
+
 	return pos_arr;
 
 }
@@ -84,7 +90,7 @@ bool BoardGame::calculateSlope(int x, int y, int &board_x, int &board_y){
 bool BoardGame::victoryOnSlope(Player &player, const int &origin){
 	for(int y=0; y < y_max; y++){
 		for(int x=0; x < x_max; x++){
-			std::tuple<int,int,int> pos = getXY(x, y, origin);
+			std::tuple<int,int> pos = getXY(x, y, origin);
 			int real_x = std::get<0>(pos);
 			int real_y = std::get<1>(pos);
 			int real_pos[2] = {real_x, real_y};
@@ -92,7 +98,7 @@ bool BoardGame::victoryOnSlope(Player &player, const int &origin){
 
 			for(int point_y=0; point_y < y_max; point_y++){
 				for(int point_x=0; point_x < x_max; point_x++){
-					std::tuple<int,int,int> point_pos = getXY(point_x, point_y, origin);
+					std::tuple<int,int> point_pos = getXY(point_x, point_y, origin);
 
 					if(calculateSlope(real_x,real_y, std::get<0>(point_pos), std::get<1>(point_pos)) && player.getMarkCount() < x_max){
 						if(game[point_y][point_x] == player.getPlayerMark()){
@@ -116,16 +122,17 @@ bool BoardGame::victoryOnSlope(Player &player, const int &origin){
 //the logic after this if statement does not cover.
 bool BoardGame::victoryOnStraightLine(Player &player, const int &origin){
 	int edge_coords[4][2];
-	static std::tuple<int,int,int> zero_pos = getXY(0, 0, origin);
+	static std::tuple<int,int> zero_pos = getXY(0, 0, origin);
 	int init_pos[2] = {std::get<0>(zero_pos), std::get<1>(zero_pos)};
 
-	std::array<int,2> delta_pos = rotMatrixMultiply((90),init_pos);
+	std::array<int,2> delta_pos;
 	for(int i=0; i < 4; i++){
-		delta_pos = rotMatrixMultiply(90 * (i+1),init_pos);
+		delta_pos = rotMatrixMultiply(-90,init_pos);
 		player.resetMarkCount();
+
 		for(int y=0; y < y_max; y++){
 			for(int x=0; x < x_max; x++){
-				std::tuple<int,int,int> point_pos = getXY(x, y, origin);
+				std::tuple<int,int> point_pos = getXY(x, y, origin);
 				int cur_pos[2] = {std::get<0>(point_pos),std::get<1>(point_pos)};
 				for(int j=0; j < 2; j++){
 					if(delta_pos[j] == init_pos[j] && cur_pos[j] == init_pos[j] && game[y][x] == player.getPlayerMark()){
@@ -137,6 +144,8 @@ bool BoardGame::victoryOnStraightLine(Player &player, const int &origin){
 				}
 			}	
 		}
+		init_pos[0] = delta_pos[0];
+		init_pos[1] = delta_pos[1];
 	}
 	return false;
 	
@@ -145,14 +154,12 @@ bool BoardGame::victoryOnStraightLine(Player &player, const int &origin){
 bool BoardGame::calculateVictory(Player &player){
 	const int origin = findOrigin(y_max);
 
-	static std::tuple<int,int,int> zero_pos = getXY(0, 0, origin);
+	static std::tuple<int,int> zero_pos = getXY(0, 0, origin);
 	int init_pos[2] = {std::get<0>(zero_pos), std::get<1>(zero_pos)};
 
 	//variable to rotate around grid -135 degrees
 	const static std::array<int,2> delta_pos = rotMatrixMultiply(-135,init_pos);
 	
-	std::cout << "\n" << victoryOnStraightLine(player, origin) << "\n";
-	std::cout << "\n" << victoryOnSlope(player, origin) << "\n";
 	if(victoryOnStraightLine(player, origin) == true || victoryOnSlope(player, origin) == true){
 		return true;
 	}

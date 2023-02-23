@@ -6,6 +6,8 @@
 #include <iterator>
 #include "player.h"
 #include <array>
+#include <Eigen/Dense>
+
 class BoardGame {
 public:
 	int startGame();
