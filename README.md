@@ -22,11 +22,7 @@ You'll need the Eigen library, it's makes things much easier.
 
 ```
 git clone https://github.com/GuyLiner/tictac.git
-
 cd tictac/src/
-
 make
-
 ./tictac
-
 ```
